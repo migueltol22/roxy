@@ -6,31 +6,9 @@ use std::{
     process,
 };
 
-use roxy::token::Token;
+use roxy::scanner::Scanner;
 
-
-struct Scanner {}
-
-impl Scanner {
-    fn new(source: &str) -> Scanner {
-        Scanner {}
-    }
-
-    fn scan_tokens(&self) -> Vec<Token> {
-        Vec::new()
-    }
-
-    fn error(&self, line: u32, message: &str) {
-        self.report(line, "", message);
-    }
-
-    fn report(&self, line: u32, where_: &str, message: &str) {
-        println!("[line {}] Error {}: {}", line, where_, message);
-    }
-}
-
-
-fn run_file(path: &str) -> Result<(), anyhow::Error>{
+fn run_file(path: &str) -> Result<(), anyhow::Error> {
     let mut f = File::open(path).expect("File not found");
     let mut source = String::new();
 
@@ -39,7 +17,7 @@ fn run_file(path: &str) -> Result<(), anyhow::Error>{
     run(&source)
 }
 
-fn run_prompt() -> Result<(), anyhow::Error>{
+fn run_prompt() -> Result<(), anyhow::Error> {
     let mut handler = stdin().lock();
     loop {
         let mut source = String::new();
@@ -48,14 +26,14 @@ fn run_prompt() -> Result<(), anyhow::Error>{
         }
         match run(&source) {
             Ok(_) => (),
-            Err(e) => println!("{:?}", e)
+            Err(e) => println!("{:?}", e),
         };
     }
     Ok(())
 }
 
-fn run(source: &str) -> Result<(), anyhow::Error>{
-    let scanner = Scanner::new(source);
+fn run(source: &str) -> Result<(), anyhow::Error> {
+    let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
 
     for token in tokens {
@@ -63,7 +41,6 @@ fn run(source: &str) -> Result<(), anyhow::Error>{
     }
 
     Ok(())
-
 }
 
 fn main() -> anyhow::Result<()> {
