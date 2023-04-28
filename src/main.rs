@@ -2,6 +2,7 @@ use std::{
     env,
     fs::File,
     io::stdin,
+    io::{self, Write},
     io::{BufRead, Read},
     process,
 };
@@ -20,6 +21,8 @@ fn run_file(path: &str) -> Result<(), anyhow::Error> {
 fn run_prompt() -> Result<(), anyhow::Error> {
     let mut handler = stdin().lock();
     loop {
+        print!("> ");
+        io::stdout().flush()?;
         let mut source = String::new();
         if handler.read_line(&mut source).is_err() || source.is_empty() {
             break;

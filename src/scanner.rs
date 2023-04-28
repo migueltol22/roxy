@@ -1,4 +1,24 @@
 use crate::token::{Token, TokenType};
+use phf::phf_map;
+
+const KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
+    "and" => TokenType::And,
+    "class" => TokenType::Class,
+    "else" => TokenType::Else,
+    "false" => TokenType::False,
+    "for" => TokenType::For,
+    "fun" => TokenType::Fun,
+    "if" => TokenType::If,
+    "nil" => TokenType::Nil,
+    "or" => TokenType::Or,
+    "print" => TokenType::Print,
+    "return" => TokenType::Return,
+    "super" => TokenType::Super,
+    "this" => TokenType::This,
+    "true" => TokenType::True,
+    "var" => TokenType::Var,
+    "while" => TokenType::While,
+};
 
 pub struct Scanner {
     source: String,
@@ -28,12 +48,13 @@ impl Scanner {
         }
 
         self.tokens
-            .push(Token::new(TokenType::Eof, "".to_string(), None, self.line));
+            .push(Token::new(TokenType::Eof, "".to_string(), self.line));
         self.tokens.clone()
     }
 
     fn scan_token(&mut self) {
-        match self.advance() {
+        let c = self.advance();
+        match c {
             '(' => self.add_token(TokenType::LeftParen),
             ')' => self.add_token(TokenType::RightParen),
             '{' => self.add_token(TokenType::LeftBrace),
@@ -75,8 +96,112 @@ impl Scanner {
                 };
                 self.add_token(token_type);
             }
-            _ => self.error(self.line, "Unexpected character."),
+            '/' => {
+                if self.match_('/') {
+                    // A comment goes until the end of the line.
+                    while self.peek() != '\n' && !self.is_at_end() {
+                        self.advance();
+                    }
+                } else {
+                    self.add_token(TokenType::Slash);
+                }
+            }
+            ' ' | '\r' | '\t' => {}
+            '\n' => self.line += 1,
+            '"' => self.string(),
+            _ => {
+                if self.is_digit(c) {
+                    self.number();
+                } else if self.is_alpha(c) {
+                    self.identifier();
+                } else {
+                    self.error(self.line, "Unexpected character.");
+                }
+            }
         }
+    }
+
+    fn is_digit(&mut self, c: char) -> bool {
+        c >= '0' && c <= '9'
+    }
+
+    fn is_alpha(&mut self, c: char) -> bool {
+        (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+    }
+
+    fn number(&mut self) {
+        while self.is_digit(self.peek()) {
+            self.advance();
+        }
+
+        // Look for a fractional part.
+        if self.peek() == '.' && self.is_digit(self.peek_next()) {
+            // Consume the "."
+            self.advance();
+
+            while self.is_digit(self.peek()) {
+                self.advance();
+            }
+        }
+
+        let value = self
+            .source
+            .chars()
+            .skip(self.start)
+            .take(self.current - self.start)
+            .collect::<String>();
+        dbg!(&value);
+        // TODO: Add error handling. Convert to result
+        self.add_token(TokenType::Number(value.parse().unwrap()))
+    }
+
+    fn identifier(&mut self) {
+        while (self.is_alpha(self.peek()) || self.is_digit(self.peek())) && !self.is_at_end() {
+            self.advance();
+        }
+        let value = self
+            .source
+            .chars()
+            .skip(self.start)
+            .take(self.current - self.start)
+            .collect::<String>();
+        let token_type = KEYWORDS
+            .get(&value.as_str())
+            .cloned()
+            .unwrap_or(TokenType::Identifier(value));
+        self.add_token(token_type)
+    }
+
+    fn string(&mut self) {
+        while self.peek() != '"' && !self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+            self.advance();
+        }
+
+        self.advance();
+        let value = self
+            .source
+            .chars()
+            .skip(self.start + 1)
+            .take(self.current - self.start - 2)
+            .collect::<String>();
+        self.add_token(TokenType::String(value))
+    }
+
+    fn peek(&self) -> char {
+        if self.is_at_end() {
+            return '\0';
+        }
+        self.source.chars().nth(self.current).unwrap()
+    }
+
+    fn peek_next(&self) -> char {
+        if self.current + 1 >= self.source.len() {
+            return '\0';
+        }
+        self.source.chars().nth(self.current + 1).unwrap()
     }
 
     fn match_(&mut self, expected: char) -> bool {
@@ -106,8 +231,7 @@ impl Scanner {
             .skip(self.start)
             .take(self.current - self.start)
             .collect::<String>();
-        self.tokens
-            .push(Token::new(token_type, text, None, self.line));
+        self.tokens.push(Token::new(token_type, text, self.line));
     }
 
     fn error(&self, line: u32, message: &str) {
