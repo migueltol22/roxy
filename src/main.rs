@@ -7,6 +7,7 @@ use std::{
     process,
 };
 
+use roxy::parser::Parser;
 use roxy::scanner::Scanner;
 
 fn run_file(path: &str) -> Result<(), anyhow::Error> {
@@ -39,9 +40,8 @@ fn run(source: &str) -> Result<(), anyhow::Error> {
     let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
 
-    for token in tokens {
-        println!("{:?}", token);
-    }
+    let mut parser = Parser::new(tokens);
+    parser.parse();
 
     Ok(())
 }
