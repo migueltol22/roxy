@@ -41,7 +41,9 @@ fn run(source: &str) -> Result<(), anyhow::Error> {
     let tokens = scanner.scan_tokens();
 
     let mut parser = Parser::new(tokens);
-    parser.parse();
+    if let Some(expr) = parser.parse() {
+        println!("{:?}", expr);
+    }
 
     Ok(())
 }

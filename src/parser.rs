@@ -1,7 +1,7 @@
 use crate::token::{Token, TokenType};
 
 #[derive(Debug, Clone)]
-enum Expr {
+pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
     Literal(Token),
@@ -18,35 +18,38 @@ impl Parser {
         Parser { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) {
-        let expression = self.expression();
-        println!("{:?}", expression);
+    pub fn parse(&mut self) -> Option<Expr> {
+        let expression = match self.expression() {
+            Ok(expr) => Some(expr),
+            Err(_) => None,
+        };
+        expression
     }
 
-    fn expression(&mut self) -> Expr {
+    fn expression(&mut self) -> Result<Expr, anyhow::Error> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Expr {
-        let mut expr = self.comparison();
+    fn equality(&mut self) -> Result<Expr, anyhow::Error> {
+        let mut expr = self.comparison()?;
 
         while let Some(token_type) = self.current_token() {
             match *token_type {
                 TokenType::BangEqual | TokenType::EqualEqual => {
                     self.advance();
                     let operator = self.previous();
-                    let right = self.comparison();
+                    let right = self.comparison()?;
                     expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
                 }
                 _ => break,
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn comparison(&mut self) -> Expr {
-        let mut expr = self.term();
+    fn comparison(&mut self) -> Result<Expr, anyhow::Error> {
+        let mut expr = self.term()?;
 
         while let Some(token_type) = self.current_token() {
             match *token_type {
@@ -56,59 +59,59 @@ impl Parser {
                 | TokenType::LessEqual => {
                     self.advance();
                     let operator = self.previous();
-                    let right = self.term();
+                    let right = self.term()?;
                     expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
                 }
                 _ => break,
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn term(&mut self) -> Expr {
-        let mut expr = self.factor();
+    fn term(&mut self) -> Result<Expr, anyhow::Error> {
+        let mut expr = self.factor()?;
 
         while let Some(token_type) = self.current_token() {
             match *token_type {
                 TokenType::Minus | TokenType::Plus => {
                     self.advance();
                     let operator = self.previous();
-                    let right = self.factor();
+                    let right = self.factor()?;
                     expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
                 }
                 _ => break,
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn factor(&mut self) -> Expr {
-        let mut expr = self.unary();
+    fn factor(&mut self) -> Result<Expr, anyhow::Error> {
+        let mut expr = self.unary()?;
         while let Some(token_type) = self.current_token() {
             match *token_type {
                 TokenType::Star | TokenType::Slash => {
                     self.advance();
                     let operator = self.previous();
-                    let right = self.unary();
+                    let right = self.unary()?;
                     expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
                 }
                 _ => break,
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn unary(&mut self) -> Expr {
+    fn unary(&mut self) -> Result<Expr, anyhow::Error> {
         if let Some(token_type) = self.current_token() {
             match *token_type {
                 TokenType::Bang | TokenType::Minus => {
                     self.advance();
                     let operator = self.previous();
-                    let right = self.unary();
-                    return Expr::Unary(operator, Box::new(right));
+                    let right = self.unary()?;
+                    return Ok(Expr::Unary(operator, Box::new(right)));
                 }
                 _ => (),
             }
@@ -117,7 +120,7 @@ impl Parser {
         self.primary()
     }
 
-    fn primary(&mut self) -> Expr {
+    fn primary(&mut self) -> Result<Expr, anyhow::Error> {
         if let Some(token_type) = self.current_token() {
             match token_type {
                 TokenType::False
@@ -126,19 +129,19 @@ impl Parser {
                 | TokenType::Number(_)
                 | TokenType::String(_) => {
                     self.advance();
-                    return Expr::Literal(self.previous());
+                    return Ok(Expr::Literal(self.previous()));
                 }
                 TokenType::LeftParen => {
                     self.advance();
-                    let expr = self.expression();
+                    let expr = self.expression()?;
                     self.consume(TokenType::RightParen, "Expect ')' after expression.");
-                    return Expr::Grouping(Box::new(expr));
+                    return Ok(Expr::Grouping(Box::new(expr)));
                 }
                 // Change these to errors and return a Result instead
-                _ => panic!("Expect expression."),
+                _ => (),
             }
         }
-        panic!("Expect expression.")
+        Err(anyhow::anyhow!("Expect expression."))
     }
 
     fn consume(&mut self, token_type: TokenType, message: &str) -> Token {
@@ -182,5 +185,29 @@ impl Parser {
 
     fn peek(&self) -> &Token {
         &self.tokens[self.current]
+    }
+
+    fn synchronize(&mut self) {
+        self.advance();
+
+        while !self.is_at_end() {
+            if self.previous().token_type == TokenType::Semicolon {
+                return;
+            }
+
+            match self.peek().token_type {
+                TokenType::Class
+                | TokenType::Fun
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => return,
+                _ => (),
+            }
+
+            self.advance();
+        }
     }
 }
