@@ -34,12 +34,12 @@ impl Interpreter {
         let expr = parser
             .parse()
             .ok_or(anyhow::anyhow!("Failed to parse expression"))?;
-        let val = self.visit(expr)?;
+        let val = self.evaluate(expr)?;
         println!("{:?}", val);
         Ok(())
     }
 
-    fn visit(&mut self, expr: Expr) -> Result<RuntimeValue, anyhow::Error> {
+    fn evaluate(&mut self, expr: Expr) -> Result<RuntimeValue, anyhow::Error> {
         match expr {
             Expr::Literal(l) => match l.token_type {
                 TokenType::Number(n) => Ok(RuntimeValue::Number(n)),
@@ -48,9 +48,9 @@ impl Interpreter {
                 TokenType::Nil => Ok(RuntimeValue::Nil),
                 _ => Err(anyhow::anyhow!("Invalid literal")),
             },
-            Expr::Grouping(g) => self.visit(*g),
+            Expr::Grouping(g) => self.evaluate(*g),
             Expr::Unary(u, right) => {
-                let right = self.visit(*right)?;
+                let right = self.evaluate(*right)?;
                 match u.token_type {
                     TokenType::Bang => Ok(RuntimeValue::Boolean(!right.is_truthy())),
                     TokenType::Minus => match right {
