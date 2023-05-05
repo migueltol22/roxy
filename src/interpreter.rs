@@ -1,3 +1,5 @@
+use std::ops::{Add, Sub, Mul, Div};
+
 use crate::parser::{Expr, Parser};
 use crate::scanner::Scanner;
 use crate::token::TokenType;
@@ -41,7 +43,7 @@ impl Interpreter {
 
     fn evaluate(&mut self, expr: Expr) -> Result<RuntimeValue, anyhow::Error> {
         match expr {
-            Expr::Literal(l) => match l.token_type {
+            Expr::Literal(token) => match token.token_type {
                 TokenType::Number(n) => Ok(RuntimeValue::Number(n)),
                 TokenType::String(s) => Ok(RuntimeValue::String(s)),
                 TokenType::Bool(b) => Ok(RuntimeValue::Boolean(b)),
@@ -49,9 +51,9 @@ impl Interpreter {
                 _ => Err(anyhow::anyhow!("Invalid literal")),
             },
             Expr::Grouping(g) => self.evaluate(*g),
-            Expr::Unary(u, right) => {
+            Expr::Unary(token, right) => {
                 let right = self.evaluate(*right)?;
-                match u.token_type {
+                match token.token_type {
                     TokenType::Bang => Ok(RuntimeValue::Boolean(!right.is_truthy())),
                     TokenType::Minus => match right {
                         RuntimeValue::Number(n) => Ok(RuntimeValue::Number(-n)),
@@ -59,8 +61,28 @@ impl Interpreter {
                     },
                     _ => Err(anyhow::anyhow!("Invalid unary operator")),
                 }
+            },
+            Expr::Binary(left, token, right) => {
+                let left = self.evaluate(*left)?;
+                let right = self.evaluate(*right)?;
+
+                match token.token_type {
+                    TokenType::Minus => self.evaluate_op(left, right, f64::sub),
+                    TokenType::Plus => self.evaluate_op(left, right, f64::add),
+                    TokenType::Slash => self.evaluate_op(left, right, f64::mul),
+                    TokenType::Star => self.evaluate_op(left, right, f64::div),
+                    _ => Err(anyhow::anyhow!("Invalid binary operator"))
+                }
             }
-            _ => Err(anyhow::anyhow!("Invalid expression")),
+        }
+    }
+
+    fn evaluate_op<F>(&self, l: RuntimeValue, r: RuntimeValue, f: F) -> Result<RuntimeValue, anyhow::Error> 
+    where 
+        F: FnOnce(f64, f64) -> f64{
+        match (l, r) {
+            (RuntimeValue::Number(l), RuntimeValue::Number(r)) => Ok(RuntimeValue::Number(f(l, r))),
+            _ => Err(anyhow::anyhow!("Operands must be numbers"))
         }
     }
 }
