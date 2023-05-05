@@ -7,8 +7,7 @@ use std::{
     process,
 };
 
-use roxy::parser::Parser;
-use roxy::scanner::Scanner;
+use roxy::interpreter::Interpreter;
 
 fn run_file(path: &str) -> Result<(), anyhow::Error> {
     let mut f = File::open(path).expect("File not found");
@@ -37,14 +36,9 @@ fn run_prompt() -> Result<(), anyhow::Error> {
 }
 
 fn run(source: &str) -> Result<(), anyhow::Error> {
-    let mut scanner = Scanner::new(source);
-    let tokens = scanner.scan_tokens();
-
-    let mut parser = Parser::new(tokens);
-    if let Some(expr) = parser.parse() {
-        println!("{:?}", expr);
-    }
-
+    let mut interpreter = Interpreter::new();
+    let out = interpreter.interpret(source)?;
+    println!("{:?}", out);
     Ok(())
 }
 

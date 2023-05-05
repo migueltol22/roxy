@@ -150,7 +150,6 @@ impl Scanner {
             .skip(self.start)
             .take(self.current - self.start)
             .collect::<String>();
-        dbg!(&value);
         // TODO: Add error handling. Convert to result
         self.add_token(TokenType::Number(value.parse().unwrap()))
     }
