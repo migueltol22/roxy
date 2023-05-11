@@ -1,7 +1,6 @@
 use std::ops::{Div, Mul, Sub};
 
-use crate::parser::{Expr, Parser};
-use crate::scanner::Scanner;
+use crate::parser::Expr;
 use crate::token::TokenType;
 
 #[derive(Debug)]
@@ -39,13 +38,7 @@ impl Interpreter {
         Interpreter
     }
 
-    pub fn interpret(&mut self, source: &str) -> Result<(), anyhow::Error> {
-        let mut scanner = Scanner::new(source);
-        let tokens = scanner.scan_tokens();
-        let mut parser = Parser::new(tokens);
-        let expr = parser
-            .parse()
-            .ok_or(anyhow::anyhow!("Failed to parse expression"))?;
+    pub fn interpret(&mut self, expr: Expr) -> Result<(), anyhow::Error> {
         let val = self.evaluate(expr)?;
         println!("{:?}", val);
         Ok(())
