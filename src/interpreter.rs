@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{Sub, Mul, Div};
 
 use crate::parser::{Expr, Parser};
 use crate::scanner::Scanner;
@@ -18,6 +18,16 @@ impl RuntimeValue {
             RuntimeValue::Nil => false,
             RuntimeValue::Boolean(b) => *b,
             _ => true,
+        }
+    }
+
+    fn is_equal(&self, rhs: RuntimeValue) -> bool {
+        match (self, rhs) {
+            (RuntimeValue::Nil, RuntimeValue::Nil) => true,
+            (RuntimeValue::Number(n1), RuntimeValue::Number(n2)) => *n1 == n2,
+            (RuntimeValue::String(s1), RuntimeValue::String(s2)) => *s1 == s2,
+            (RuntimeValue::Boolean(b1), RuntimeValue::Boolean(b2)) => *b1 == b2,
+            _ => false,
         }
     }
 }
@@ -67,21 +77,42 @@ impl Interpreter {
                 let right = self.evaluate(*right)?;
 
                 match token.token_type {
-                    TokenType::Minus => self.evaluate_op(left, right, f64::sub),
-                    TokenType::Plus => self.evaluate_op(left, right, f64::add),
-                    TokenType::Slash => self.evaluate_op(left, right, f64::mul),
-                    TokenType::Star => self.evaluate_op(left, right, f64::div),
-                    _ => Err(anyhow::anyhow!("Invalid binary operator"))
+                    TokenType::Minus => self.eval_arithmetic_op(left, right, f64::sub),
+                    TokenType::Slash => self.eval_arithmetic_op(left, right, f64::mul),
+                    TokenType::Star => self.eval_arithmetic_op(left, right, f64::div),
+                    TokenType::Plus => {
+                        match (left, right) {
+                            (RuntimeValue::Number(l), RuntimeValue::Number(r)) => Ok(RuntimeValue::Number(l + r)),
+                            (RuntimeValue::String(l), RuntimeValue::String(r)) => Ok(RuntimeValue::String(l + &r)),
+                            _ => Err(anyhow::anyhow!("Unsupported type for plus operator"))
+                        }
+                    }
+                    TokenType::Greater => self.eval_boolean_op(left, right, |l, r| l > r),
+                    TokenType::GreaterEqual => self.eval_boolean_op(left, right, |l, r| l >= r),
+                    TokenType::Less => self.eval_boolean_op(left, right, |l, r| l < r),
+                    TokenType::LessEqual => self.eval_boolean_op(left, right, |l, r| l <= r),
+                    TokenType::BangEqual => Ok(RuntimeValue::Boolean(!left.is_equal(right))),
+                    TokenType::EqualEqual => Ok(RuntimeValue::Boolean(left.is_equal(right))),
+                    _ => Err(anyhow::anyhow!("Invalid binary expression"))
                 }
             }
         }
     }
 
-    fn evaluate_op<F>(&self, l: RuntimeValue, r: RuntimeValue, f: F) -> Result<RuntimeValue, anyhow::Error> 
+    fn eval_arithmetic_op<F>(&self, l: RuntimeValue, r: RuntimeValue, f: F) -> Result<RuntimeValue, anyhow::Error> 
     where 
         F: FnOnce(f64, f64) -> f64{
         match (l, r) {
             (RuntimeValue::Number(l), RuntimeValue::Number(r)) => Ok(RuntimeValue::Number(f(l, r))),
+            _ => Err(anyhow::anyhow!("Operands must be numbers"))
+        }
+    }
+
+    fn eval_boolean_op<F>(&self, l: RuntimeValue, r: RuntimeValue, f: F) -> Result<RuntimeValue, anyhow::Error> 
+    where 
+        F: FnOnce(f64, f64) -> bool{
+        match (l, r) {
+            (RuntimeValue::Number(l), RuntimeValue::Number(r)) => Ok(RuntimeValue::Boolean(f(l, r))),
             _ => Err(anyhow::anyhow!("Operands must be numbers"))
         }
     }
